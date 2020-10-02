@@ -18,6 +18,7 @@ from scipy.signal import chirp
 from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
 
+
 class JA_SysID():
 
     def __init__(self, flightFrequency):
@@ -36,16 +37,18 @@ class JA_SysID():
         # [0, 1, 2, 3] = [dX, dY, dZ, dYaw]
     
         stateNum = 0
-        caseNum = 0
-        repNum = 2
+        caseNum = 1
         axisNum = 5
-        self.f_i = 0.01                      #Initial frequency
+        repNum = 2
+
+        self.f_i = 0.10                      #Initial frequency
         self.f_f = 2                       #Final Frequency
     
     
         self.setSysIDParam(stateNum ,caseNum, repNum, axisNum, flightFrequency)
         self.setFlightInput()
-        self.setVelCommandsForm()
+        self.setVelCommandsForm(flightFrequency)
+#        self.setVelCommandsFormQuat()
 
            
         
@@ -125,7 +128,7 @@ class JA_SysID():
             # (i.e.) Frequencies, length and scale of movements
             self.delta_chirp = 25
             self.delta_trim  = 5
-            self.scaleChirp  = 30
+            self.scaleChirp  = 1.0
     
     
             # Define ending/final time of movements
@@ -185,10 +188,10 @@ class JA_SysID():
         # Defining parameters
         self.a = 2*math.pi*(self.f_f-self.f_i)/self.delta_HMPIM
         self.b = 2*math.pi*self.f_i
-        self.n = 1.5 #extinction factor
-        self.G = 2.5 #HMPIM Gain (i.e the scale factor)
+        self.n = 0.5 #extinction factor
+        self.G = 5 #HMPIM Gain (i.e the scale factor)
 
-        self.Sigma1 = 0.5*self.a*self.t_Hebert**2
+        self.Sigma1 = 0.5*self.a*self.t_Hebert**2 +self.b*self.t_Hebert
         self.Sigma2 = self.b+0.5*self.a
         self.Sigma2ext = self.b+0.5*self.a*self.t_Hebert**self.n
         
@@ -319,13 +322,14 @@ class JA_SysID():
                 
                 
                 
-    def setVelCommandsForm(self):
+    def setVelCommandsForm(self,flightFrequency):
         # Put in form of [velx, vely, velz, ang] for pos
         # Put in form [x, y, z, q1, q2, q3, q4] for vel
     
         # Set up zeros to dictate which axis to excite
         
         self.inputCommands = np.zeros((len(self.finalInput), self.inputComLength))
+        self.testTime = len(self.finalInput)/flightFrequency
         for x in range(0,len(self.finalInput)):
             self.inputCommands[x][self.axis] = self.finalInput[x]
             
@@ -334,6 +338,21 @@ class JA_SysID():
                 self.inputCommands[x][3:6] = self.euler
                 
     
+    def setVelCommandsFormQuat(self):
+        quatTest = True
+        
+        self.quatCommands = np.zeros((len(self.finalInput), self.inputComLength+1))
+        
+        for x in range(0, len(self.finalInput)):
+            roll = self.inputCommands[x][3]
+            pitch = self.inputCommands[x][4]
+            yaw = self.inputCommands[x][5]
+            
+            rot = R.from_euler('zyx', [roll, pitch, yaw], degrees = True)
+            quatTest = rot.as_quat()
+            self.quatCommands[x][3:7] = quatTest
+            
+        self.inputCommands = self.quatCommands
     
     
     def setTxtFile(self, fileName):
@@ -398,14 +417,19 @@ class JA_SysID():
 if __name__ == '__main__':
     print("Python Script has opened") 
     flight = JA_SysID(30)
+    derp = np.linspace(0, len(flight.finalInput)/30, len(flight.finalInput))
     
+
     plt.figure(0)
 #    plt.title('Multisine_'+ str(flight.MultiDesign))
 #    plt.xlabel('Time Steps')
 #    plt.ylabel('Degrees')
-    plt.plot(flight.finalInput)
+    plt.plot(derp, flight.finalInput)
+
+    print(flight.testTime)
     
 
+    testVariable =  flight.finalInput    
     
     flight.setTxtFile('sysID_flight_input.txt')
 

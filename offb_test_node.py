@@ -25,22 +25,24 @@ class offb_test_node:
         print("Initializing")        
         self.testHeight = 5;        #Currently hard coded height
         self.attitude_flag = True
+        self.threadTest = True
                 
         
-        
+        self.testClockTiming
         self.setInitVar()
-        self.setPubSub(30)          # Currently hard-coded height
+        self.setPubSub(30)          # Currently hard-coded flight rate (Hz)
         #self.wait_for_topics(10)
         self.setPrelimPoints()
         self.setArmTest(True, 5)
+    
         
         
         self.changeModeTest("OFFBOARD", 5)
         #self.setOffboard()
         
         #Running actual mission        
-        #self.engageBasicflight()
-        #self.engageFlightInputs()
+#        self.engageBasicflight()
+#        self.engageFlightInputs()
         self.setFlightHold()
      
      
@@ -86,7 +88,7 @@ class offb_test_node:
     def setPubSub(self, flightFrequency):
         print("Set Publishers and Subscribers")
         rospy.init_node('Sys_ID_Commands', anonymous=True)        
-                
+
         # Position and acceleration setpoint publisher
         self.positionPub = rospy.Publisher('mavros/setpoint_raw/local', PositionTarget, queue_size=1)
 
@@ -116,6 +118,13 @@ class offb_test_node:
 #        self.att_thread.daemon = True
 #        self.att_thread.start()
        
+#       
+#        rospy.loginfo("Clock test start")
+#        now = rospy.get_rostime()
+#        rospy.sleep(10)
+#        then = rospy.get_rostime()
+#        diff = then-now
+#        rospy.loginfo("The time difference is"+ str(diff))
        
        
     def wait_for_topics(self, timeout):
@@ -138,7 +147,16 @@ class offb_test_node:
             except rospy.ROSException as e:
                 self.fail(e)
 
-
+    def testClockTiming(self):
+        rospy.loginfo("Clock test start")
+        now = rospy.get_rostime()
+        rospy.sleep(10)
+        then = rospy.get_rostime()
+        diff = then-now
+        rospy.loginfo("The time difference is"+ str(diff))
+       
+       
+       
        
     def setPrelimPoints(self):
         self.desPose.pose.position.x = 0
@@ -152,17 +170,19 @@ class offb_test_node:
 #        quaternion = quaternion_from_euler(yaw, 0, 0)
 #        self.desPose.pose.orientation = Quaternion(*quaternion)
             
-        # For loop to send a handful of signals
-        for i in range(100):
-            self.posePub.publish(self.desPose)
-            self.rate.sleep
-        rospy.loginfo("Finished publishing preliminary setpoints")
+        # 9/20 THIS SECTION NOT NEEDED IN THREADED ATTEMPTS
+        if not self.threadTest:
+            for i in range(100):
+                self.posePub.publish(self.desPose)
+                self.rate.sleep
+            rospy.loginfo("Finished publishing preliminary setpoints")
         
-        # Threading testing
-        self.publishReady = False
-        self.pos_thread = Thread(target=self.engageThreadedFlight, args=())
-        self.pos_thread.daemon = True
-        self.pos_thread.start()
+        else:
+            # Threading testing
+            self.publishReady = False
+            self.pos_thread = Thread(target=self.engageThreadedFlight, args=())
+            self.pos_thread.daemon = True
+            self.pos_thread.start()
         
     
     
@@ -247,6 +267,7 @@ class offb_test_node:
             
     def engageThreadedFlight(self):
         rospy.loginfo("run complex mission")
+        self.rate = rospy.Rate(30)  # Hz 
 #        if self.publishReady == False:
         while self.publishReady == False:
 #            while not rospy.is_shutdown():
@@ -265,11 +286,13 @@ class offb_test_node:
         rospy.loginfo("publish threaded points")
         self.getFlightxt()
         currentLine = 1
-#        rospy.loginfo(self.desPose.pose)
+#        self.rate = rospy.Rate(40)
+        rospy.loginfo(self.desPose.pose)
 #        if (self.state.mode == "OFFBOARD" and self.state.armed == True):
 #            print("BOTH MODES PROPERLY SET!!!")
         while not rospy.is_shutdown():
             self.getSetpoint(currentLine)
+#            rospy.loginfo(str(self.rate))
             rospy.loginfo(self.desPose.pose)
             self.posePub.publish(self.desPose)
 #            self.desPose.pose.position.y += .01
@@ -311,18 +334,26 @@ class offb_test_node:
         datasplit[2] = datasplit[2].rstrip()
         datarray = np.array(map(float, datasplit))
         if (self.attitude_flag):
-            self.desPose.pose.position.x = datarray[0]
-            self.desPose.pose.position.y = datarray[1]
+#           self.desPose.pose.position.x = datarray[0]
+#           self.desPose.pose.position.y = datarray[1]
 #           self.desPose.pose.position.z = datarray[2]
-            
-            
-            self.roll = math.radians(datarray[3])
-            self.pitch = math.radians(datarray[4])
-            self.yaw = math.radians(datarray[5])
+        
+           self.roll = math.radians(datarray[3])
+           self.pitch = math.radians(datarray[4])
+           self.yaw = math.radians(datarray[5])
 #            self.quaternion = quaternion_from_euler(self.roll, self.pitch, self.yaw)
-            self.quaternion = quaternion_from_euler(0, 0, self.yaw)
-            self.desPose.pose.orientation = Quaternion(*self.quaternion)
+           self.quaternion = quaternion_from_euler(0, 0, self.yaw)
+           self.desPose.pose.orientation = Quaternion(*self.quaternion)
 
+#
+#    def getSetpoint(self, currentLine):
+#        data = self.lines[currentLine]
+#        datasplit = data.split(",")
+#        datasplit[2] = datasplit[2].rstrip()
+#        datarray = np.array(map(float, datasplit))
+#        
+#        self.quaternion = datarray[3:7]
+#        self.desPose.pose.orientation = Quaternion(*self.quaternion)
 
     def setFlightHold(self):
         self.reachPosition(0, 0, 2, 0.1)
@@ -330,8 +361,9 @@ class offb_test_node:
         print("In hold to switch publishing type "+ str(self.reached))
         self.publishReady = True
         self.publishFinal = False
+        holdRate = rospy.Rate(5)
         while not self.publishFinal:
-            self.rate.sleep()
+            holdRate.sleep()
 
 
 
@@ -350,8 +382,8 @@ class offb_test_node:
         """offset: meters"""
         self.reached = False
         timeout = 10
-        loop_freq = 10 #Hz
-        rate = rospy.Rate(loop_freq)
+        loop_freq = 30 #Hz
+        positionRate = rospy.Rate(loop_freq)
         for i in xrange(timeout * loop_freq):
             desired = np.array((x, y, z))
             pos = np.array((self.actPose.pose.position.x,
@@ -364,7 +396,7 @@ class offb_test_node:
             
             
             try:
-                rate.sleep()
+                positionRate.sleep()
             except rospy.ROSException as e:
                 self.fail(e)
         
