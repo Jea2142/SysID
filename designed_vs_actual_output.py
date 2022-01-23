@@ -11,9 +11,10 @@ import matplotlib.pyplot as plt
 #import scipy.spatial
 
 from scipy.spatial.transform import Rotation as R
+from JA_SysID_Git import JA_SysID
 
 
-file_name = 'HMPIM24.csv'
+file_name = 'multi08_output.csv'
 
 with open('/home/jea2142/catkin_ws/src/flight_inputs/scripts/Bag_Files/'+file_name) as csv_file:
     csv_reader = csv.reader(csv_file)
@@ -35,15 +36,18 @@ with open('/home/jea2142/catkin_ws/src/flight_inputs/scripts/Bag_Files/'+file_na
             position = [float(row[4]), float(row[5]), float(row[6]) ]
             quaternion = [float(row[7]), float(row[8]), float(row[9]), float(row[10]) ]
             
-            
-            rot = R.from_quat(quaternion)
-            euler = rot.as_euler('zyx', degrees=True)
+            if quaternion == [0, 0, 0, 0]:
+                euler = [0,0,0]
+                marker = line_count
+            else:
+                rot = R.from_quat(quaternion)
+                euler = rot.as_euler('zyx', degrees=True)
             
             # Test section for accuracy of data
-            r = R.from_euler('zyx', euler, degrees=True)
-            quat_test = r.as_quat()
-            test_length.append(quat_test)
-            quat_og.append(quaternion)
+#            r = R.from_euler('zyx', euler, degrees=True)
+#            quat_test = r.as_quat()
+#            test_length.append(quat_test)
+#            quat_og.append(quaternion)
 
             orientation.append(euler)
             pose.append(position)
@@ -78,15 +82,55 @@ plt.plot(time, orientation[:,1])
 
 
 plt.figure(3)
+plt.figure(figsize=(8,6))
 plt.title('Yaw, Zaxis')
 plt.xlabel('Time (s)')
 plt.ylabel('Degrees')
 plt.plot(time, orientation[:,0])
 
+
 plt.figure(4)
 #plt.plot(time, test_length[:,2]-quat_length[:,2])
 #plt.plot(time,test_length[:,2])
 
+##########################################################################
+flight = JA_SysID(30)
+    
 
+
+#    plt.title('Multisine_'+ str(flight.MultiDesign))
+#    plt.xlabel('Time Steps')
+#    plt.ylabel('Degrees')
+
+testTime = time
+testOrientation = orientation[:,0]
+
+#testTime = time[marker+1:-1]
+#testTime = testTime - testTime[0]
+#testOrientation = orientation[marker+1:-1,0]
+testLength = len(flight.finalInput)
+
+
+derp = np.linspace(0, testLength/30, testLength)
+plt.plot(derp, flight.finalInput, testTime, testOrientation[:,0])
+plt.title('Designed Input vs Published Input')
+#plt.figure(5)
+
+#plt.plot(derp[450:750], flight.finalInput[450:750], derp[450:750], testOrientation[450:750])
+#plt.title('Designed Input vs Published Input')
+#plt.figure(6)
+
+####### GRAPH OF DIFFERENCES NOT CURRENTLY AVAILABLE
+#if testLength < len(testOrientation):
+#    testDifference = flight.finalInput - testOrientation[0:len(flight.finalInput)]
+#    
+#else:
+##    testDifference = flight.finalInput[0:len(testOrientation)] - testOrientation
+##    testDifference = flight.finalInput[1:301] - testOrientation[0:300]
+#    testDifference = flight.finalInput[451:751] 
+#    
+##plt.plot(testOrientation)
+#plt.plot(testDifference)
+#plt.title('Input Error over Time')
 
 

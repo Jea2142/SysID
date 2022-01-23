@@ -37,12 +37,12 @@ class JA_SysID():
         # [0, 1, 2, 3] = [dX, dY, dZ, dYaw]
     
         stateNum = 0
-        caseNum = 1
+        caseNum = 2
         axisNum = 5
         repNum = 2
 
         self.f_i = 0.10                      #Initial frequency
-        self.f_f = 2                       #Final Frequency
+        self.f_f = 3                       #Final Frequency
     
     
         self.setSysIDParam(stateNum ,caseNum, repNum, axisNum, flightFrequency)
@@ -188,8 +188,8 @@ class JA_SysID():
         # Defining parameters
         self.a = 2*math.pi*(self.f_f-self.f_i)/self.delta_HMPIM
         self.b = 2*math.pi*self.f_i
-        self.n = 0.5 #extinction factor
-        self.G = 5 #HMPIM Gain (i.e the scale factor)
+        self.n = 1.5 #extinction factor
+        self.G = 2.5 #HMPIM Gain (i.e the scale factor)
 
         self.Sigma1 = 0.5*self.a*self.t_Hebert**2 +self.b*self.t_Hebert
         self.Sigma2 = self.b+0.5*self.a
@@ -229,45 +229,104 @@ class JA_SysID():
             
 
     def setMultisine(self):
-        #  Multisine (Original values taken from Alabsi)
         # UPDATE JULY20: Not most efficient implementation but works...
-        self.delta_multi = 10
-        self.delta_mtrim = 5
-        self.A = 5.00
+        # UPDATE NOV16: Cases beyond original Alalbsi 4 axis example
+    
         
-        ### New code needed for excitation of three axis at the same time but "option" included
+        
+        # Test Cases for Omega/Phase Choice
+        # Case 0: Alabsi original 4 axis case
+        # Case 1: GA optimized 3 axis for 2Hz
+        # Case 2: GA optimized 3 axis for 3Hz
+        
+        # MultiDesign: Which Omega/Phase axis to choose
+        # [1,2,3] for RPY or [1,2,3,4] for four rotors
+        
+        ## MultiInput: For multiaxis testing 
+        self.MultiCase = 1
+        self.MultiDesign = 3
         self.MultiInput = False   
-        self.MultiDesign = 4
         
+        ### PART 1: Initial Parameters and specification 
+        self.delta_mtrim = 5
+        self.A = 2.5
         self.u1  = 0
         self.du1 = 0
+
+        ## PART 2: Import proper Omega/Phase case based on specification
+        # Use phase in rad/s and Omega in Hz
+
+        if self.MultiCase == 0: #Alabsi
+            self.delta_multi = 10
+            self.dF = 0.1
+            
+            
+            self.Omega1 = np.array([0.2, 0.6, 1.0, 1.4, 1.8, 2.2, 2.6])
+            self.Omega2 =  np.array([x+self.dF for x in self.Omega1])
+            self.Omega3 =  np.array([x+self.dF for x in self.Omega2])
+            self.Omega4 =  np.array([x+self.dF for x in self.Omega3])
+            self.Omega = np.array([self.Omega1, self.Omega2, self.Omega3, self.Omega4] )
+            
+            self.Phase1 = np.array([90.0, 261.9, 69.5, 60.0, 224.6, 229.7, 200.3])
+            self.Phase2 = np.array([92.5, 268.5, 70.2, 61.1, 227.2, 221.7, 204.6])
+            self.Phase3 = np.array([111.9, 301.6, 118.3, 141.1, 324.9, 328.1, 331.2])
+            self.Phase4 = np.array([187.7, 76.8, 318.3, 28.8, 271.1, 340.4, 42.7])
+            
+            self.Phase1 = math.pi*self.Phase1/180
+            self.Phase2 = math.pi*self.Phase2/180
+            self.Phase3 = math.pi*self.Phase3/180
+            self.Phase4 = math.pi*self.Phase4/180
+            self.Phase = np.array([self.Phase1, self.Phase2, self.Phase3, self.Phase4])
+            
+            
+        if self.MultiCase == 1: # rpy2Hz
+            self.delta_multi = 20
+            self.dF = 0.05
+            
+            self.Omega1 = np.array([0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 1, 1.15, 1.3, 1.45, 1.6, 1.75, 1.9])
+            self.Omega2 =  np.array([x+self.dF for x in self.Omega1])
+            self.Omega3 =  np.array([x+self.dF for x in self.Omega2])
+            self.Omega = np.array([self.Omega1, self.Omega2, self.Omega3] )
+            
+            self.Phase1 = np.array([153, 38, 294, 319, 219, 71, 190, 135, 172, 250, 92, 176, 238])
+            self.Phase2 = np.array([245, 359, 29, 31, 291, 109, 127, 321, 31, 68, 350, 217, 312])
+            self.Phase3 = np.array([142, 314, 150, 299, 128, 114, 270, 235, 185, 228, 239, 87, 87])
+            
+            self.Phase1 = math.pi*self.Phase1/180
+            self.Phase2 = math.pi*self.Phase2/180
+            self.Phase3 = math.pi*self.Phase3/180
+            self.Phase = np.array([self.Phase1, self.Phase2, self.Phase3])
+            
+            
+            
+            
+        if self.MultiCase == 2: # rpy3Hz
+            self.delta_multi = 20
+            self.dF = 0.1
+            
+            self.Omega1 = np.array([0.1, 0.4, 0.7 , 1, 1.3, 1.6, 1.9, 2.2, 2.5, 2.8])
+            self.Omega2 =  np.array([x+0.1 for x in self.Omega1])
+            self.Omega3 =  np.array([x+0.1 for x in self.Omega2])
+            self.Omega = np.array([self.Omega1, self.Omega2, self.Omega3] )
+            
+            self.Phase1 = np.array([282, 345, 47, 138, 68, 315, 113, 336, 7, 261])
+            self.Phase2 = np.array([280, 337, 37, 68, 242, 105, 65, 323, 43, 281])
+            self.Phase3 = np.array([130, 180, 128, 289, 254, 257, 127, 168, 262, 106])
         
+            self.Phase1 = math.pi*self.Phase1/180
+            self.Phase2 = math.pi*self.Phase2/180
+            self.Phase3 = math.pi*self.Phase3/180
+            self.Phase = np.array([self.Phase1, self.Phase2, self.Phase3])
+        
+        ## Part 3: Create time and input vectors
         self.t_m = np.linspace(0, self.delta_multi, self.delta_multi*self.commandRate)
         self.t_mt = np.linspace(self.delta_multi, self.delta_multi+self.delta_mtrim, self.delta_mtrim*self.commandRate)
 
         # Trim zeros for velocity commands
         self.du_trim = np.zeros(len(self.t_mt))
-
-
-        # Use phase in rad/s and Omega in Hz
-        self.Omega1 = np.array([0.2, 0.6, 1.0, 1.4, 1.8, 2.2, 2.6])
-        self.Omega2 =  np.array([x+0.1 for x in self.Omega1])
-        self.Omega3 =  np.array([x+0.1 for x in self.Omega2])
-        self.Omega4 =  np.array([x+0.1 for x in self.Omega3])
-        self.Omega = np.array([self.Omega1, self.Omega2, self.Omega3, self.Omega4] )
-        
-        self.Phase1 = np.array([90.0, 261.9, 69.5, 60.0, 224.6, 229.7, 200.3])
-        self.Phase2 = np.array([92.5, 268.5, 70.2, 61.1, 227.2, 221.7, 204.6])
-        self.Phase3 = np.array([111.9, 301.6, 118.3, 141.1, 324.9, 328.1, 331.2])
-        self.Phase4 = np.array([187.7, 76.8, 318.3, 28.8, 271.1, 340.4, 42.7])
-        
-        self.Phase1 = math.pi*self.Phase1/180
-        self.Phase2 = math.pi*self.Phase2/180
-        self.Phase3 = math.pi*self.Phase3/180
-        self.Phase4 = math.pi*self.Phase4/180
-        self.Phase = np.array([self.Phase1, self.Phase2, self.Phase3, self.Phase4])
         
         
+        # Forge the input u or du
         if self.MultiInput == False:
             i = self.MultiDesign - 1
             for x in range(0, len(self.Omega1)):
@@ -421,6 +480,7 @@ if __name__ == '__main__':
     
 
     plt.figure(0)
+    plt.figure(figsize=(8,6))
 #    plt.title('Multisine_'+ str(flight.MultiDesign))
 #    plt.xlabel('Time Steps')
 #    plt.ylabel('Degrees')
